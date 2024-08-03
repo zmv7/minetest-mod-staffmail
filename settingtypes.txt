@@ -1,0 +1,1 @@
+staffmail.dcwh_url (Discord webhook URL for StaffMail) string
