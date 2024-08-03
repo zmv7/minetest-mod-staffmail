@@ -3,6 +3,23 @@ local F = minetest.formspec_escape
 local delay = {}
 local selected = {}
 local msglist = {}
+local http = minetest.request_http_api()
+local dcmsg
+if not http then
+    minetest.log("warning",
+        "Discord relay of StaffMail is disabled. Please add `staffmail` to secure.http_mods to enable it.")
+    return
+else
+    dcmsg = function(data)
+        local json = minetest.write_json({content = data})
+        http.fetch({
+            url = "your webhook URL",
+            method = "POST",
+            extra_headers = {"Content-Type: application/json"},
+            data = json
+        },function() end)
+    end
+end
 
 minetest.register_privilege("staffmail",{
 	give_to_singleplayer = false,
@@ -63,6 +80,9 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 				return
 			end
 			s:set_string(name.." - '"..F(fields.title).."' ("..os.date("%d.%m.%Y %H:%M:%S")..")",F(fields.text))
+			if dcmsg then
+				dcmsg(name.." sent '"..fields.title.."':```\n"..fields.text.."\n```")
+			end
 			setdelay(name)
 			minetest.close_formspec(name,"staffmail")
 			minetest.chat_send_player(name,"'"..fields.title.."' sent successfully")
@@ -103,14 +123,17 @@ minetest.register_chatcommand("smail",{
 	privs = {interact=true},
 	func = function(name, param)
 		if param and param ~= "" then
-			local title, text = param:match("^(%S+) (%S+)$")
-			if (title and text) then
+			local params = param:split(" ", false, 1)
+			if params and #params == 2 then
 				if delay[name] then
 					return fale, "You have to wait 10 minutes before sending another message to the staff"
 				end
-				s:set_string(name.." - '"..F(title).."' ("..os.date("%d.%m.%Y %H:%M:%S")..")",F(text))
+				s:set_string(name.." - '"..F(params[1]).."' ("..os.date("%d.%m.%Y %H:%M:%S")..")",F(params[2]))
+				if dcmsg then
+					dcmsg(name.." send '"..params[1].."':```\n"..params[2].."\n```")
+				end
 				setdelay(name)
-				return true, "'"..title.."' sent successfully."
+				return true, "'"..params[1].."' sent successfully."
 			else
 				return false, "Invalid params"
 			end
@@ -129,9 +152,12 @@ minetest.register_chatcommand("purge-smail",{
 	description = "Purge all messages in the staffmail",
 	privs = {staffmail=true},
 	func = function(name)
+		local count = 0
 		for title,content in pairs(s:to_table().fields) do
 			if type(title) == "string" then
 				s:set_string(title,"")
+				count = count + 1
 			end
 		end
+		return true, "Deleted "..tostring(count).." entries"
 end})
