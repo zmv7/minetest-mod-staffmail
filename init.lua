@@ -6,19 +6,25 @@ local msglist = {}
 local http = minetest.request_http_api()
 local dcmsg
 if not http then
-    minetest.log("warning",
-        "Discord relay of StaffMail is disabled. Please add `staffmail` to secure.http_mods to enable it.")
-    return
+	minetest.log("warning",
+		"Discord relay of StaffMail is disabled. Please add `staffmail` to secure.http_mods to enable it.")
 else
-    dcmsg = function(data)
-        local json = minetest.write_json({content = data})
-        http.fetch({
-            url = "your webhook URL",
-            method = "POST",
-            extra_headers = {"Content-Type: application/json"},
-            data = json
-        },function() end)
-    end
+	local url = minetest.settings:get("staffmail.dcwh_url")
+	if url then
+		dcmsg = function(data)
+			local json = minetest.write_json({content = data})
+			http.fetch({
+				url = url,
+				method = "POST",
+				extra_headers = {"Content-Type: application/json"},
+				data = json
+			},function() end)
+		end
+	else
+		minetest.log("warning",
+			"Discord relay of StaffMail is disabled because Discord webhook URL is not set.")
+
+	end
 end
 
 minetest.register_privilege("staffmail",{
